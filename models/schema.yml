@@ -1,0 +1,218 @@
+# schema.yml                (gz_raw_data.raw_gz_ship) ($ dbt test --select source:gz_raw_data.raw_gz_sales)
+
+version: 2
+
+sources:
+  - name: gz_raw_data
+    description: data from circle to dashboard
+    tables:
+
+      - name: raw_gz_product
+        description: Liste id_products avec le prix d'achat pour calcul marge
+        columns:
+          - name: products_id 
+            description: cle_primaire
+            tests:
+              - unique
+              - not_null
+          - name: purchase_price
+            description: the purchase price of the product
+            
+      - name: raw_gz_sales
+        description: Liste des ventes avec revenue pour calculs marges
+        columns:
+          - name: date_date
+            description: date of purchase
+          - name: orders_id
+            description: foreign key to ship
+          - name: pdt_id
+            description: foreign key to product
+          - name: revenue
+            description: the amount paid by the customer to purchase the product. revenue = quantity * selling_price
+          - name: quantity
+            description: the quantity of products purchased for a given order
+        tests:
+          - unique:
+              column_name: "(orders_id || '-' || pdt_id)"
+        loaded_at_field: "CAST(date_date AS TIMESTAMP)"
+        freshness: 
+          warn_after:
+            count: 90
+            period: day
+
+      - name: raw_gz_ship
+        description: Liste frai transports pour calcul marge opérationnelle
+        columns:
+          - name: orders_id
+            description: cle_primaire
+            tests:
+              - unique
+              - not_null
+          - name: shipping_fee
+            description: the price the customer pays for shipping
+          - name: log_cost
+            description: the cost of preparing the parcel in the distribution centre/warehouse
+          - name: ship_cost
+            description: shipping cost paid by Greenweez to the carrier/logistics provider
+
+
+models:
+
+  # Intermediate #
+  - name: int_sales_margin
+    description: margin calculation per order line / product sales
+    columns:
+      - name: orders_id
+        description: orders key
+        tests:
+          - not_null
+      - name: product_id
+        description: products key
+        tests:
+          - not_null
+      - name: margin
+        description: margin = revenue - purchase_cost
+        tests:
+          - not_null
+      - name: Purchase_cost
+        description: purchase_cost = quantity * purchase_price
+        tests:
+          - not_null
+      - name: date_date
+        description: date of the order
+        tests:
+          - not_null
+      - name: revenue
+        description: sum of revenue per order
+        tests:
+          - not_null
+      - name: quantity
+        description: sum of quantity per order
+        tests:
+          - not_null
+    tests:
+    - unique:
+        column_name: "(orders_id || '-' || product_id)"
+
+  # Intermediate #
+  - name: int_orders_margin
+    description: margin calculation per order
+    columns:
+      - name: orders_id
+        description: primary key
+        tests:
+          - unique
+          - not_null
+      - name: margin
+        description: margin = revenue - purchase_cost
+        tests:
+          - not_null
+      - name: Purchase_cost
+        description: purchase_cost = quantity * purchase_price
+        tests:
+          - not_null
+      - name: date_date
+        description: date of the order
+        tests:
+          - not_null
+      - name: revenue
+        description: sum of revenue per order
+        tests:
+          - not_null
+      - name: quantity
+        description: sum of quantity per order
+        tests:
+          - not_null
+
+  # Intermediate #
+  - name: int_orders_operational
+    description: operational margin calculation per order
+    columns:
+    - name: orders_id
+      description: primary key
+      tests:
+        - unique
+        - not_null
+    - name: date_date
+      description: date of the order
+      tests:
+        - not_null
+    - name: operational_margin
+      description: operational_margin = margin + shipping_fee - logcost - ship_cost
+    - name: quantity
+      description: sum of quantity per order
+      tests:
+        - not_null
+    - name: revenue
+      description: sum of revenue per order
+      tests:
+        - not_null
+    - name: purchase_cost
+      description: purchase_cost = quantity * purchase_price
+      tests:
+        - not_null
+    - name: margin
+      description: margin = revenue - purchase_cost
+      tests:
+        - not_null
+    - name: shipping_fee
+      description: the price the customer pays for shipping
+    - name: logcost
+      description: the cost of preparing the parcel in the distribution centre/warehouse
+    - name: ship_cost
+      description: shipping cost paid by Greenweez to the carrier/logistics provider
+
+  # Mart #
+  - name: finance_days
+    description: operationnal table finance
+    columns:
+    - name: date_date
+      description: colums date
+      tests:
+        - not_null
+    - name: nb_transactions
+      description: nombre transaction
+      tests:
+        - not_null
+    - name: revenue
+      description: revenue
+      tests:
+        - not_null
+    - name: average_basket
+      description: moyenne baket
+      tests:
+        - not_null
+    - name: average_basket_bis
+      description: moyenne bascket bis
+      tests:
+        - not_null
+    - name: margin
+      description: marge
+      tests:
+        - not_null
+    - name: operational_margin
+      description: marge operationnelle
+      tests:
+        - not_null
+    - name: purchase_cost
+      description: cout achat
+      tests:
+        - not_null
+    - name: shipping_fee
+      description: shipping_feet
+      tests:
+        - not_null
+    - name: logcost
+      description: frais livraison
+      tests:
+        - not_null
+    - name: ship_cost
+      description: frais de transport
+      tests:
+        - not_null
+    - name: quantity
+      description: quantité/commande
+      tests:
+        - not_null
+
+
